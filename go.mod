@@ -1,4 +1,4 @@
-module github.com/hodgesds/iouring-go
+module github.com/ImVexed/iouring-go
 
 go 1.12
 
