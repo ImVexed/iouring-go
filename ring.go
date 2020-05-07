@@ -24,6 +24,10 @@ type Ring struct {
 	fileReg FileRegistry
 }
 
+func (r *Ring) Fd() int {
+	return r.fd
+}
+
 // New is used to create an iouring.Ring.
 func New(size uint, p *Params) (*Ring, error) {
 	if p == nil {
