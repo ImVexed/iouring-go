@@ -7,12 +7,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"syscall"
 	"time"
 	"unsafe"
 
+	"github.com/ImVexed/iouring-go"
+	"github.com/edsrzf/mmap-go"
 	gsse "github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin"
-	"github.com/hodgesds/iouring-go"
 	"github.com/r3labs/sse"
 )
 
@@ -20,6 +22,7 @@ var (
 	fds     = make([]int32, 0)
 	message []byte
 	ring    *iouring.Ring
+	rmap    []byte
 )
 
 func main() {
@@ -36,7 +39,18 @@ func main() {
 	// Create a static message to deliver that can also be compared against when we receive it over the network
 	message, _ = json.Marshal(msg)
 
-	ring, _ = iouring.New(1024, &iouring.Params{})
+	ring, _ = iouring.New(10240, &iouring.Params{})
+
+	rmap, _ = mmap.MapRegion(nil, 10<<10, mmap.RDWR, mmap.ANON, 0)
+
+	vecs := []*syscall.Iovec{
+		{
+			Base: &rmap[0],
+			Len:  uint64(len(rmap)),
+		},
+	}
+
+	iouring.RegisterBuffers(ring.Fd(), vecs)
 
 	// Start a new go routine that sends a message every second
 	go sendMessage()
@@ -48,9 +62,20 @@ func main() {
 		c.Header("Content-Type", "text/event-stream")
 		c.Writer.WriteHeaderNow()
 
-		nc, _, _ := c.Writer.Hijack()
+		// For some reason if we hijack immediately we get EOF's?
+		time.Sleep(200 * time.Millisecond)
 
-		sf, _ := nc.(*net.TCPConn).File()
+		nc, _, err := c.Writer.Hijack()
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		sf, err := nc.(*net.TCPConn).File()
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 
 		fds = append(fds, int32(sf.Fd()))
 	})
@@ -65,8 +90,7 @@ func main() {
 	go http.Serve(l, r)
 
 	// Spawn n many clients to establish an SSE
-	for i := 0; i < 10; i++ {
-		time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 1000; i++ {
 		go spawnClient(addr)
 	}
 
@@ -89,7 +113,7 @@ func spawnClient(addr string) {
 			log.Fatalf("Client received invalid response, expected: %s but got %s", string(message), string(evt.Data))
 		}
 	}); err != nil {
-		log.Fatalln(err.Error())
+		log.Fatalln("Subscribe failed", err.Error())
 	}
 }
 
@@ -125,8 +149,9 @@ func send(fds []int32, data []byte) error {
 	wire.WriteString("\r\n")
 
 	rawData := wire.Bytes()
+	copy(rmap, rawData)
 
-	addr := (uint64)(uintptr(unsafe.Pointer(&rawData[0])))
+	addr := (uint64)(uintptr(unsafe.Pointer(&rmap[0])))
 	length := uint32(len(rawData))
 
 	// Queue up n many SQE's for each file descriptor

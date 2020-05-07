@@ -1,5 +1,10 @@
+github.com/ImVexed/iouring-go v0.0.0-20200504060704-2b30a9bbdb60/go.mod h1:Ini3OkrF73aEmiCVInaUovndAiR/5PNJVfaUeqzorQA=
+github.com/ImVexed/iouring-go v0.0.0-20200507181245-d0dad00a33aa h1:Ol+pbXlqXocCrvZD2+23TDfxq+xwuV62bEBfSQ7TGbw=
+github.com/ImVexed/iouring-go v0.0.0-20200507181245-d0dad00a33aa/go.mod h1:0TH2LM+u1bs9flwP4RtuCXo1RcrGMiUGQN9sBTXykzs=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/edsrzf/mmap-go v1.0.0 h1:CEBF7HpRnUCSJgGUb5h1Gm7e3VkmVDrR8lvWVLtrOFw=
+github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=
 github.com/gin-contrib/sse v0.1.0 h1:Y/yl/+YNO8GZSjAhjMsSuLt29uWRFHdHYUb5lYOV9qE=
 github.com/gin-contrib/sse v0.1.0/go.mod h1:RHrZQHXnP2xjPF+u1gW/2HnVO7nvIa9PG3Gm+fLHvGI=
 github.com/gin-gonic/gin v1.6.3 h1:ahKqKTFpO5KTPHxWZjEdPScmYaGtLo8Y4DMHoEsnp14=
