@@ -3,7 +3,6 @@ module github.com/ImVexed/iouring-go
 go 1.12
 
 require (
-	github.com/ImVexed/iouring-go v0.0.0-20200504060704-2b30a9bbdb60 // indirect
 	github.com/gin-gonic/gin v1.6.3 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/r3labs/sse v0.0.0-20200310095403-ee05428e4d0e // indirect

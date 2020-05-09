@@ -301,14 +301,14 @@ func (i *ringFIO) getCqe(reqID uint64) (int, error) {
 		}
 	}
 	if i.r.debug {
-		fmt.Printf("sq state: %+v\n", *i.r.sq.state)
-		fmt.Printf("sq head: %v tail: %v\nsq entries: %+v\n", *i.r.sq.Head, *i.r.sq.Tail, i.r.sq.Entries[:3])
-		fmt.Printf("sq array: %+v\n", i.r.sq.Array[:3])
-		fmt.Printf("cq head: %v tail: %v\ncq entries: %+v\n", *i.r.cq.Head, *i.r.cq.Tail, i.r.cq.Entries[:3])
+		fmt.Printf("sq state: %+v\n", *i.r.Sq.state)
+		fmt.Printf("sq head: %v tail: %v\nsq entries: %+v\n", *i.r.Sq.Head, *i.r.Sq.Tail, i.r.Sq.Entries[:3])
+		fmt.Printf("sq array: %+v\n", i.r.Sq.Array[:3])
+		fmt.Printf("cq head: %v tail: %v\ncq entries: %+v\n", *i.r.Cq.Head, *i.r.Cq.Tail, i.r.Cq.Entries[:3])
 	}
 
 	// Use EntryBy to return the CQE by the "request" id in UserData.
-	cqe, err := i.r.cq.EntryBy(reqID)
+	cqe, err := i.r.Cq.EntryBy(reqID)
 	if err != nil {
 		return 0, err
 	}
@@ -377,9 +377,9 @@ func (i *ringFIO) Read(b []byte) (int, error) {
 
 	if i.r.debug {
 		fmt.Printf("pre enter\n")
-		fmt.Printf("sq head: %v tail: %v\nsq entries: %+v\n", *i.r.sq.Head, *i.r.sq.Tail, i.r.sq.Entries[:3])
-		fmt.Printf("cq head: %v tail: %v\ncq entries: %+v\n", *i.r.cq.Head, *i.r.cq.Tail, i.r.cq.Entries[:3])
-		fmt.Printf("sq state: %+v\n", *i.r.sq.state)
+		fmt.Printf("sq head: %v tail: %v\nsq entries: %+v\n", *i.r.Sq.Head, *i.r.Sq.Tail, i.r.Sq.Entries[:3])
+		fmt.Printf("cq head: %v tail: %v\ncq entries: %+v\n", *i.r.Cq.Head, *i.r.Cq.Tail, i.r.Cq.Entries[:3])
+		fmt.Printf("sq state: %+v\n", *i.r.Sq.state)
 	}
 
 	return i.getCqe(reqID)

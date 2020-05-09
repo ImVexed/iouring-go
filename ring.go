@@ -14,10 +14,10 @@ import (
 type Ring struct {
 	fd      int
 	p       *Params
-	cq      *CompletionQueue
-	cqMu    sync.RWMutex
-	sq      *SubmitQueue
-	sqMu    sync.RWMutex
+	Cq      *CompletionQueue
+	CqMu    sync.RWMutex
+	Sq      *SubmitQueue
+	SqMu    sync.RWMutex
 	sqPool  sync.Pool
 	idx     *uint64
 	debug   bool
@@ -52,8 +52,8 @@ func New(size uint, p *Params) (*Ring, error) {
 	return &Ring{
 		p:       p,
 		fd:      fd,
-		cq:      &cq,
-		sq:      &sq,
+		Cq:      &cq,
+		Sq:      &sq,
 		idx:     &idx,
 		fileReg: NewFileRegistry(fd),
 	}, nil
@@ -62,26 +62,26 @@ func New(size uint, p *Params) (*Ring, error) {
 // Enter is used to enter the ring.
 func (r *Ring) Enter(toSubmit uint, minComplete uint, flags uint, sigset *unix.Sigset_t) error {
 	// Acquire the submit barrier so that the ring can safely be entered.
-	r.sq.submitBarrier()
-	if r.sq.NeedWakeup() {
+	r.Sq.submitBarrier()
+	if r.Sq.NeedWakeup() {
 		flags |= EnterSqWakeup
 	}
 	completed, err := Enter(r.fd, toSubmit, minComplete, flags, sigset)
 	if err != nil {
 		// TODO(hodgesds): are certain errors able to empty the ring?
-		r.sq.fill()
+		r.Sq.fill()
 		return err
 	}
 	if uint(completed) < toSubmit {
-		r.sq.fill()
+		r.Sq.fill()
 		return nil
 	}
-	r.sq.empty()
+	r.Sq.empty()
 	return nil
 }
 
 func (r *Ring) canEnter() bool {
-	return atomic.LoadUint32(r.sq.Head) != atomic.LoadUint32(r.sq.Tail)
+	return atomic.LoadUint32(r.Sq.Head) != atomic.LoadUint32(r.Sq.Tail)
 }
 
 // Close is used to close the ring.
@@ -98,16 +98,16 @@ func (r *Ring) Close() error {
 }
 
 func (r *Ring) closeCq() error {
-	r.cqMu.Lock()
-	defer r.cqMu.Unlock()
-	if r.cq == nil {
+	r.CqMu.Lock()
+	defer r.CqMu.Unlock()
+	if r.Cq == nil {
 		return nil
 	}
 
 	_, _, errno := syscall.Syscall6(
 		syscall.SYS_MUNMAP,
-		r.cq.ptr,
-		uintptr(r.cq.Size),
+		r.Cq.ptr,
+		uintptr(r.Cq.Size),
 		uintptr(0),
 		uintptr(0),
 		uintptr(0),
@@ -117,21 +117,21 @@ func (r *Ring) closeCq() error {
 		err := errno
 		return errors.Wrap(err, "failed to munmap cq ring")
 	}
-	r.cq = nil
+	r.Cq = nil
 	return nil
 }
 
 func (r *Ring) closeSq() error {
-	r.sqMu.Lock()
-	defer r.sqMu.Unlock()
-	if r.sq == nil {
+	r.SqMu.Lock()
+	defer r.SqMu.Unlock()
+	if r.Sq == nil {
 		return nil
 	}
 
 	_, _, errno := syscall.Syscall6(
 		syscall.SYS_MUNMAP,
-		r.sq.ptr,
-		uintptr(r.sq.Size),
+		r.Sq.ptr,
+		uintptr(r.Sq.Size),
 		uintptr(0),
 		uintptr(0),
 		uintptr(0),
@@ -141,32 +141,32 @@ func (r *Ring) closeSq() error {
 		err := errno
 		return errors.Wrap(err, "failed to munmap sq ring")
 	}
-	r.sq = nil
+	r.Sq = nil
 	return nil
 }
 
 // SubmitHead returns the position of the head of the submit queue. This method
 // is safe for calling concurrently.
 func (r *Ring) SubmitHead() int {
-	return int(atomic.LoadUint32(r.sq.Head) & atomic.LoadUint32(r.sq.Mask))
+	return int(atomic.LoadUint32(r.Sq.Head) & atomic.LoadUint32(r.Sq.Mask))
 }
 
 // SubmitTail returns the position of the tail of the submit queue. This method
 // is safe for calling concurrently.
 func (r *Ring) SubmitTail() int {
-	return int(atomic.LoadUint32(r.sq.Tail) & atomic.LoadUint32(r.sq.Mask))
+	return int(atomic.LoadUint32(r.Sq.Tail) & atomic.LoadUint32(r.Sq.Mask))
 }
 
 // CompleteHead returns the position of the head of the completion queue. This
 // method is safe for calling concurrently.
 func (r *Ring) CompleteHead() int {
-	return int(atomic.LoadUint32(r.cq.Head) & atomic.LoadUint32(r.cq.Mask))
+	return int(atomic.LoadUint32(r.Cq.Head) & atomic.LoadUint32(r.Cq.Mask))
 }
 
 // CompleteTail returns the position of the tail of the submit queue. This method
 // is safe for calling concurrently.
 func (r *Ring) CompleteTail() int {
-	return int(atomic.LoadUint32(r.cq.Tail) & atomic.LoadUint32(r.cq.Mask))
+	return int(atomic.LoadUint32(r.Cq.Tail) & atomic.LoadUint32(r.Cq.Mask))
 }
 
 // SubmitEntry returns the next available SubmitEntry or nil if the ring is
@@ -178,28 +178,28 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 
 	if r.p != nil && (uint(r.p.Flags)&SetupIOPoll == 0) {
 	getNext:
-		tail := atomic.LoadUint32(r.sq.Tail)
-		head := atomic.LoadUint32(r.sq.Head)
-		mask := atomic.LoadUint32(r.sq.Mask)
+		tail := atomic.LoadUint32(r.Sq.Tail)
+		head := atomic.LoadUint32(r.Sq.Head)
+		mask := atomic.LoadUint32(r.Sq.Mask)
 		next := tail&mask + 1
-		if next-head <= uint32(len(r.sq.Entries)) {
+		if next-head <= uint32(len(r.Sq.Entries)) {
 			// Make sure the ring is safe for updating by acquring the
 			// update barrier.
-			r.sq.updateBarrier()
-			if !atomic.CompareAndSwapUint32(r.sq.Tail, tail, next) {
+			r.Sq.updateBarrier()
+			if !atomic.CompareAndSwapUint32(r.Sq.Tail, tail, next) {
 				goto getNext
 			}
 			// Increase the write counter as the caller will be
 			// updating the returned SubmitEntry.
-			r.sq.startWrite()
+			r.Sq.startWrite()
 
 			// The callback that is returned is used to update the
 			// state of the ring and decrement the active writes
 			// counter.
-			return &r.sq.Entries[tail&mask], func() {
-				r.sq.completeWrite()
-				r.sq.fill()
-				r.sq.Array[next-1] = head & mask
+			return &r.Sq.Entries[tail&mask], func() {
+				r.Sq.completeWrite()
+				r.Sq.fill()
+				r.Sq.Array[next-1] = head & mask
 			}
 		}
 		goto getNext

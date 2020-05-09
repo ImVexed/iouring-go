@@ -14,7 +14,6 @@ import (
 	"github.com/ImVexed/iouring-go"
 	"github.com/edsrzf/mmap-go"
 	gsse "github.com/gin-contrib/sse"
-	"github.com/gin-gonic/gin"
 	"github.com/r3labs/sse"
 )
 
@@ -55,26 +54,30 @@ func main() {
 	// Start a new go routine that sends a message every second
 	go sendMessage()
 
-	r := gin.Default()
-
 	// Create a SSE endpoint that hijacks all incoming connections and adds their underlying file descriptors to an array
-	r.GET("/listen", func(c *gin.Context) {
-		c.Header("Content-Type", "text/event-stream")
-		c.Writer.WriteHeaderNow()
-
+	http.HandleFunc("/listen", func(w http.ResponseWriter, r *http.Request) {
+		// c.Header("Content-Type", "text/event-stream")
+		// c.Writer.WriteHeaderNow()
+		// c.Writer.Flush()
 		// For some reason if we hijack immediately we get EOF's?
-		time.Sleep(200 * time.Millisecond)
+		// time.Sleep(500 * time.Millisecond)
 
-		nc, _, err := c.Writer.Hijack()
+		nc, _, err := w.(http.Hijacker).Hijack()
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Fatalln(err.Error())
+		}
+
+		// nc.SetWriteDeadline(time.Now().Add(10 * time.Millisecond))
+
+		if _, err := nc.Write([]byte("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")); err != nil {
+			log.Fatalln(err.Error())
 		}
 
 		sf, err := nc.(*net.TCPConn).File()
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Fatalln(err.Error())
 		}
 
 		fds = append(fds, int32(sf.Fd()))
@@ -87,10 +90,10 @@ func main() {
 
 	addr := fmt.Sprintf("http://localhost:%d/listen", l.Addr().(*net.TCPAddr).Port)
 
-	go http.Serve(l, r)
+	go http.Serve(l, nil)
 
 	// Spawn n many clients to establish an SSE
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		go spawnClient(addr)
 	}
 
@@ -128,7 +131,7 @@ func sendMessage() {
 }
 
 func send(fds []int32, data []byte) error {
-	fmt.Printf("Sending %d bytes to %d sockets\n", len(data), len(fds))
+	start := time.Now()
 
 	var b bytes.Buffer
 	// Encode the JSON message into an SSE
@@ -166,5 +169,8 @@ func send(fds []int32, data []byte) error {
 		commit()
 	}
 
-	return ring.Enter(uint(len(fds)), uint(len(fds)), iouring.EnterGetEvents, nil)
+	res := ring.Enter(uint(len(fds)), uint(len(fds)), iouring.EnterGetEvents, nil)
+
+	fmt.Printf("Sent %d bytes to %d sockets in %s\n", len(data), len(fds), time.Now().Sub(start).String())
+	return res
 }
