@@ -1,6 +1,7 @@
 package iouring
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -196,6 +197,9 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 			// The callback that is returned is used to update the
 			// state of the ring and decrement the active writes
 			// counter.
+			if r.debug {
+				fmt.Printf("next: %d\nsq array:%+v\n", next, r.Sq.Array[:5])
+			}
 			return &r.Sq.Entries[tail&mask], func() {
 				r.Sq.completeWrite()
 				r.Sq.fill()
@@ -204,7 +208,6 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 		}
 		// When the ring wraps restart.
 		atomic.CompareAndSwapUint32(r.Sq.Tail, tail, 0)
-		atomic.CompareAndSwapUint32(r.Sq.Head, head, 0)
 		goto getNext
 	}
 	// TODO handle pool based
