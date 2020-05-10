@@ -13,20 +13,20 @@ func TestNew(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	require.NotZero(t, r.sq.Size)
-	require.NotNil(t, r.sq.Head)
-	require.NotNil(t, r.sq.Tail)
-	require.NotNil(t, r.sq.Mask)
-	require.NotNil(t, r.sq.Entries)
-	require.NotNil(t, r.sq.Flags)
-	require.NotNil(t, r.sq.Dropped)
-	require.NotNil(t, r.sq.Entries)
+	require.NotZero(t, r.Sq.Size)
+	require.NotNil(t, r.Sq.Head)
+	require.NotNil(t, r.Sq.Tail)
+	require.NotNil(t, r.Sq.Mask)
+	require.NotNil(t, r.Sq.Entries)
+	require.NotNil(t, r.Sq.Flags)
+	require.NotNil(t, r.Sq.Dropped)
+	require.NotNil(t, r.Sq.Entries)
 
-	require.NotZero(t, r.cq.Size)
-	require.NotNil(t, r.cq.Head)
-	require.NotNil(t, r.cq.Tail)
-	require.NotNil(t, r.cq.Mask)
-	require.NotNil(t, r.cq.Entries)
+	require.NotZero(t, r.Cq.Size)
+	require.NotNil(t, r.Cq.Head)
+	require.NotNil(t, r.Cq.Tail)
+	require.NotNil(t, r.Cq.Mask)
+	require.NotNil(t, r.Cq.Entries)
 
 	require.NoError(t, r.Close())
 }
@@ -42,7 +42,7 @@ func TestRingEnter(t *testing.T) {
 	require.NotNil(t, r)
 	count := 0
 	for i := r.SubmitHead(); i < r.SubmitTail(); i++ {
-		r.sq.Entries[i] = SubmitEntry{
+		r.Sq.Entries[i] = SubmitEntry{
 			Opcode:   Nop,
 			UserData: uint64(i),
 		}

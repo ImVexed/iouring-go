@@ -1,6 +1,8 @@
 github.com/ImVexed/iouring-go v0.0.0-20200504060704-2b30a9bbdb60/go.mod h1:Ini3OkrF73aEmiCVInaUovndAiR/5PNJVfaUeqzorQA=
 github.com/ImVexed/iouring-go v0.0.0-20200507181245-d0dad00a33aa h1:Ol+pbXlqXocCrvZD2+23TDfxq+xwuV62bEBfSQ7TGbw=
 github.com/ImVexed/iouring-go v0.0.0-20200507181245-d0dad00a33aa/go.mod h1:0TH2LM+u1bs9flwP4RtuCXo1RcrGMiUGQN9sBTXykzs=
+github.com/ImVexed/iouring-go v0.0.0-20200509045457-57b0de66c745 h1:6bsfhi6bYje4WAq91sv57QcM2FiwtK2GON8sVNJMWhk=
+github.com/ImVexed/iouring-go v0.0.0-20200509045457-57b0de66c745/go.mod h1:oMx2HYZV+kTEVmB/nwDgkofQ826o/QrmKCT3OlVtA3Q=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/edsrzf/mmap-go v1.0.0 h1:CEBF7HpRnUCSJgGUb5h1Gm7e3VkmVDrR8lvWVLtrOFw=

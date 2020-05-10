@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -171,6 +172,27 @@ func send(fds []int32, data []byte) error {
 
 	res := ring.Enter(uint(len(fds)), uint(len(fds)), iouring.EnterGetEvents, nil)
 
-	fmt.Printf("Sent %d bytes to %d sockets in %s\n", len(data), len(fds), time.Now().Sub(start).String())
+	tail := atomic.LoadUint32(ring.Cq.Tail)
+	mask := atomic.LoadUint32(ring.Cq.Mask)
+
+	seenIdx := uint32(0)
+	seen := false
+	seenEnd := false
+	for i := uint32(0); i <= tail&mask; i++ {
+		if ring.Cq.Entries[i].Flags&1 == 1 {
+			seen = true
+		} else if !seenEnd {
+			seen = false
+			seenEnd = true
+		}
+		if seen == true && !seenEnd {
+			seenIdx = i
+		}
+
+		ring.Cq.Entries[i].Flags |= 1
+		atomic.StoreUint32(ring.Cq.Head, seenIdx)
+	}
+
+	fmt.Printf("Sent %d bytes to %d sockets in %s head %d\n", len(data), len(fds), time.Now().Sub(start).String(), atomic.LoadUint32(ring.Cq.Head))
 	return res
 }

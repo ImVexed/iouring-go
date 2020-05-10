@@ -46,7 +46,7 @@ import (
 )
 
 func main() {
-	r, err := iouring.New(1024)
+	r, err := iouring.New(1024, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -66,6 +66,11 @@ func main() {
 	if _, err := rw.Write([]byte("hello io_uring!")); err != nil {
 		log.Fatal(err)
 	}
+
+	// Close the WriteCloser, which closes the open file (f).
+	if err := r.Close(); err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
@@ -77,3 +82,5 @@ https://github.com/google/vectorio
 https://github.com/shuveb/io_uring-by-example/blob/master/02_cat_uring/main.c
 
 https://golang.org/pkg/syscall/#Iovec
+
+https://github.com/golang/go/blob/master/src/runtime/mbarrier.go#L21

@@ -182,7 +182,7 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 		head := atomic.LoadUint32(r.Sq.Head)
 		mask := atomic.LoadUint32(r.Sq.Mask)
 		next := tail&mask + 1
-		if next-head <= uint32(len(r.Sq.Entries)) {
+		if next <= uint32(len(r.Sq.Entries)) {
 			// Make sure the ring is safe for updating by acquring the
 			// update barrier.
 			r.Sq.updateBarrier()
@@ -202,6 +202,9 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 				r.Sq.Array[next-1] = head & mask
 			}
 		}
+		// When the ring wraps restart.
+		atomic.CompareAndSwapUint32(r.Sq.Tail, tail, 0)
+		atomic.CompareAndSwapUint32(r.Sq.Head, head, 0)
 		goto getNext
 	}
 	// TODO handle pool based
@@ -212,6 +215,11 @@ func (r *Ring) SubmitEntry() (*SubmitEntry, func()) {
 // uint64 wrapping).
 func (r *Ring) ID() uint64 {
 	return atomic.AddUint64(r.idx, 1)
+}
+
+// FD returns the fd of the ring.
+func (r *Ring) FD() int {
+	return r.fd
 }
 
 // FileReadWriter returns an io.ReadWriter from an os.File that uses the ring.
