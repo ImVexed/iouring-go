@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -23,9 +24,14 @@ var (
 	message []byte
 	ring    *iouring.Ring
 	rmap    []byte
+	rxCount *int32
+	wg      = &sync.WaitGroup{}
 )
 
 func main() {
+	rx := int32(0)
+	rxCount = &rx
+
 	msg := struct {
 		ID      int
 		Author  string
@@ -39,7 +45,7 @@ func main() {
 	// Create a static message to deliver that can also be compared against when we receive it over the network
 	message, _ = json.Marshal(msg)
 
-	ring, _ = iouring.New(10240, &iouring.Params{})
+	ring, _ = iouring.New(1024, &iouring.Params{})
 
 	rmap, _ = mmap.MapRegion(nil, 10<<10, mmap.RDWR, mmap.ANON, 0)
 
@@ -55,13 +61,11 @@ func main() {
 	// Start a new go routine that sends a message every second
 	go sendMessage()
 
+	lck := &sync.Mutex{}
 	// Create a SSE endpoint that hijacks all incoming connections and adds their underlying file descriptors to an array
 	http.HandleFunc("/listen", func(w http.ResponseWriter, r *http.Request) {
-		// c.Header("Content-Type", "text/event-stream")
-		// c.Writer.WriteHeaderNow()
-		// c.Writer.Flush()
-		// For some reason if we hijack immediately we get EOF's?
-		// time.Sleep(500 * time.Millisecond)
+		lck.Lock()
+		defer lck.Unlock()
 
 		nc, _, err := w.(http.Hijacker).Hijack()
 
@@ -94,7 +98,7 @@ func main() {
 	go http.Serve(l, nil)
 
 	// Spawn n many clients to establish an SSE
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 100; i++ {
 		go spawnClient(addr)
 	}
 
@@ -116,6 +120,8 @@ func spawnClient(addr string) {
 		if string(message) != string(evt.Data) {
 			log.Fatalf("Client received invalid response, expected: %s but got %s", string(message), string(evt.Data))
 		}
+		wg.Done()
+		// fmt.Println("Inc")
 	}); err != nil {
 		log.Fatalln("Subscribe failed", err.Error())
 	}
@@ -170,29 +176,58 @@ func send(fds []int32, data []byte) error {
 		commit()
 	}
 
+	wg.Add(len(fds))
+
 	res := ring.Enter(uint(len(fds)), uint(len(fds)), iouring.EnterGetEvents, nil)
+
+	fmt.Println("Waiting")
+	wg.Wait()
 
 	tail := atomic.LoadUint32(ring.Cq.Tail)
 	mask := atomic.LoadUint32(ring.Cq.Mask)
+	atomic.StoreUint32(ring.Cq.Head, tail&mask)
 
-	seenIdx := uint32(0)
-	seen := false
-	seenEnd := false
-	for i := uint32(0); i <= tail&mask; i++ {
-		if ring.Cq.Entries[i].Flags&1 == 1 {
-			seen = true
-		} else if !seenEnd {
-			seen = false
-			seenEnd = true
-		}
-		if seen == true && !seenEnd {
-			seenIdx = i
-		}
+	// seenIdx := uint32(0)
+	// seen := false
+	// seenEnd := false
+	// for i := uint32(0); i <= tail&mask; i++ {
+	// 	if ring.Cq.Entries[i].Flags&1 == 1 {
+	// 		seen = true
+	// 	} else if !seenEnd {
+	// 		seen = false
+	// 		seenEnd = true
+	// 	}
+	// 	if seen == true && !seenEnd {
+	// 		seenIdx = i
+	// 	}
 
-		ring.Cq.Entries[i].Flags |= 1
-		atomic.StoreUint32(ring.Cq.Head, seenIdx)
-	}
+	// 	ring.Cq.Entries[i].Flags |= 1
+	// 	atomic.StoreUint32(ring.Cq.Head, seenIdx)
+	// }
 
-	fmt.Printf("Sent %d bytes to %d sockets in %s head %d\n", len(data), len(fds), time.Now().Sub(start).String(), atomic.LoadUint32(ring.Cq.Head))
+	fmt.Println("Sq Head", atomic.LoadUint32(ring.Sq.Head))
+	fmt.Println("Sq Tail", atomic.LoadUint32(ring.Sq.Tail))
+	fmt.Println("Sq Mask", atomic.LoadUint32(ring.Sq.Mask))
+	fmt.Println("Sq Dropped", atomic.LoadUint32(ring.Sq.Dropped))
+
+	fmt.Println("Cq Head", atomic.LoadUint32(ring.Cq.Head))
+	fmt.Println("Cq Tail", atomic.LoadUint32(ring.Cq.Tail))
+	fmt.Println("Cq Mask", atomic.LoadUint32(ring.Cq.Mask))
+
+	// ring.Sq.Reset()
+	// atomic.StoreUint32(ring.Sq.Head, 100)
+	// atomic.StoreUint32(ring.Sq.Tail, 100)
+
+	// tail := atomic.LoadUint32(ring.Cq.Tail)
+	// mask := atomic.LoadUint32(ring.Cq.Mask)
+
+	// for i := uint32(0); i <= tail&mask; i++ {
+	// 	ring.Cq.Entries[i].Flags |= 1
+	// }
+
+	//atomic.StoreUint32(ring.Cq.Head, atomic.LoadUint32(ring.Cq.Head)+uint32(len(fds)))
+	//atomic.StoreUint32(ring.Cq.Tail, 0)
+
+	fmt.Printf("Sent %d bytes to %d sockets in %s.\n", len(data), len(fds), time.Now().Sub(start).String())
 	return res
 }
